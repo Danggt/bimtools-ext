@@ -2,10 +2,10 @@ import React, { useEffect, useState } from "react";
 import axios, { AxiosError, AxiosResponse } from "axios";
 import * as XLSX from "xlsx";
 import * as WorkspaceAPI from "trimble-connect-workspace-api";
-import { Layout, Button, message, Input } from "antd";
+import { Layout, Button, message, Input, Form } from "antd";
+import { async } from "q";
 
 const { Content } = Layout;
-const sessionStorage = require("node-sessionstorage");
 
 const UpdateStatus = () => {
   const [event, setEvent] = useState();
@@ -14,7 +14,7 @@ const UpdateStatus = () => {
   const [guids, setGuids] = useState([]);
   const [rows, setRows] = useState([]);
   const [accesstoken, setAccesstoken] = useState();
-  const [sharingtoken, setSharingtoken] = useState();
+  const [projectName, setProjectName] = useState();
   useEffect(() => {
     const api = WorkspaceAPI.connect(window.parent, (event, data) => {
       setEvent(event);
@@ -46,7 +46,7 @@ const UpdateStatus = () => {
     });
   };
 
-  const updateStatusHandle = () => {
+  const updateStatusHandle = async () => {
     if (
       typeof rows === "undefined" ||
       rows.length === 0 ||
@@ -54,46 +54,56 @@ const UpdateStatus = () => {
     )
       return;
     if (event !== "viewer.onSelectionChanged") return;
-    console.log(api);
-    console.log(accesstoken)
-    const url = `https://northamerica.tcstatus.tekla.com/statusapi/1.0`;
-    axios
-      .post(
-        `${url}/auth/token`,
-        {},
+    // console.log(api);
+    // console.log(accesstoken)
+    const url = `https://europe.tcstatus.tekla.com/statusapi/1.0`;
+
+    const res_status_token = await axios.post(
+      `${url}/auth/token`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${accesstoken}`,
+        },
+      }
+    );
+    const status_token = res_status_token.data;
+
+    api.then(async (tcapi) => {
+      const modelId = data.data[0].modelId;
+      const objectRuntimeIds = [...data.data[0].objectRuntimeIds];
+      //Get projects
+      const res_projects = await axios.get(
+        `https://app21.connect.trimble.com/tc/api/2.0/projects?fullyLoaded=true&minimal=true&sort=-name`,
         {
           headers: {
             Authorization: `Bearer ${accesstoken}`,
           },
         }
-      )
-      .then((res) => {
-        console.log(res)
-        setSharingtoken(() => res.data);
-      });
+      );
+      const project = res_projects.data.filter(
+        (x) => x.name === projectName
+      )[0];
+      // console.log(project);
+      // console.log(status_token);
 
-    api.then((tcapi) => {
-      const modelId = data.data[0].modelId;
-      const objectRuntimeIds = [...data.data[0].objectRuntimeIds];
-      //console.log(`${url}/projects/${modelId}/statusactions`);
-      console.log(sharingtoken);
+      //Get action status
+      const res_statuses = await axios.get(
+        `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${project.id}/statusactions`,
+        {
+          headers: {
+            Authorization: `Bearer ${status_token}`,
+          },
+        }
+      );
+      const statuses = res_statuses.data;
 
-      // axios
-      //   .get(`${url}/projects/PdoQoPPQr-Q/statusactions`, {
-      //     headers: {
-      //       Authorization: `Bearer ${sharingtoken}`,
-      //     },
-      //   })
-      //   .then((res) => {
-      //     console.log(res);
-      //   });
-      tcapi.viewer
-        .convertToObjectIds(modelId, objectRuntimeIds)
-        .then((result) => {
-          setGuids([...result]);
-        });
-
-      tcapi.viewer
+      const guids = await tcapi.viewer.convertToObjectIds(
+        modelId,
+        objectRuntimeIds
+      );
+      let updated_statuses = [];
+      await tcapi.viewer
         .getObjectProperties(modelId, objectRuntimeIds)
         .then((result) => {
           result.forEach((element) => {
@@ -112,13 +122,45 @@ const UpdateStatus = () => {
                   return;
                 const asm_mark = item.value;
                 const guid_ifc = guids[index];
+                const items = rows.filter((x) => x.Asm_Mark.includes(asm_mark));
+                if (items.length === 0 || typeof guid_ifc === "undefined")
+                  return;
+                const matched_statuses = statuses.filter((x) =>
+                  items[0].Status.includes(x.name)
+                );
+                if (matched_statuses.length === 0) return;
+                console.log({
+                  objectId: guid_ifc,
+                  statusActionId: matched_statuses[0].id,
+                  value: "Completed",
+                  valueDate: new Date().toISOString(),
+                });
+                updated_statuses.push({
+                  objectId: guid_ifc,
+                  statusActionId: matched_statuses[0].id,
+                  value: "Completed",
+                  valueDate: new Date().toISOString(),
+                });
               });
             });
           });
         });
-      console.log(rows);
-      console.log(guids);
+      // console.log(rows);
+      // console.log(guids);
+      console.log(updated_statuses);
+
+      const res = await axios.post(
+        `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${project.id}/statusevents`,
+        updated_statuses,
+        {
+          headers: {
+            Authorization: `Bearer ${status_token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
     });
+    message.success("Update Status Completed");
   };
   return (
     <Layout style={{ backgroundColor: "#ffffff" }}>
@@ -151,13 +193,26 @@ const UpdateStatus = () => {
             columnGap: "5px",
           }}
         >
-          <Input value={accesstoken} onChange={(e)=>setAccesstoken(e.target.value)} />
+          <Form>
+            <Form.Item label="Access Token">
+              <Input
+                value={accesstoken}
+                onChange={(e) => setAccesstoken(e.target.value)}
+              />
+            </Form.Item>
+            <Form.Item label="Model Name">
+              <Input
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+              />
+            </Form.Item>
+          </Form>
           <Button
             type="primary"
             onClick={() => {
               api.then((tcapi) => {
                 tcapi.extension.getPermission("accesstoken").then((result) => {
-                  window.parent.sessionStorage.setItem("ext_token", result);
+                  setAccesstoken(result);
                 });
               });
             }}

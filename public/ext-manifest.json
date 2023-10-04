@@ -1,8 +1,8 @@
 {
     "icon": "https://components.connect.trimble.com/trimble-connect-workspace-api/examples/logo192.png",
-    "title": "ECH Extension",
-    "url": "http://127.0.0.1:3001/",
-    "description": "ECH Extension",
+    "title": "Bimtools Extension",
+    "url": "http://127.0.0.1:3000",
+    "description": "Bimtools Extension",
     "configCommand": "do_config",
     "enabled": true
   }
