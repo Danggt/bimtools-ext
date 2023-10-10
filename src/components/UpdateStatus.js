@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import * as WorkspaceAPI from "trimble-connect-workspace-api";
 import { Layout, Button, message, Input, Form } from "antd";
 import { async } from "q";
+import { Format } from "../services/GUIDConversion";
 
 const { Content } = Layout;
 
@@ -54,8 +55,6 @@ const UpdateStatus = () => {
     )
       return;
     if (event !== "viewer.onSelectionChanged") return;
-    // console.log(api);
-    // console.log(accesstoken)
     const url = `https://europe.tcstatus.tekla.com/statusapi/1.0`;
 
     const res_status_token = await axios.post(
@@ -84,9 +83,6 @@ const UpdateStatus = () => {
       const project = res_projects.data.filter(
         (x) => x.name === projectName
       )[0];
-      // console.log(project);
-      // console.log(status_token);
-
       //Get action status
       const res_statuses = await axios.get(
         `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${project.id}/statusactions`,
@@ -145,9 +141,6 @@ const UpdateStatus = () => {
             });
           });
         });
-      // console.log(rows);
-      // console.log(guids);
-      console.log(updated_statuses);
 
       const res = await axios.post(
         `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${project.id}/statusevents`,
@@ -161,6 +154,92 @@ const UpdateStatus = () => {
       );
     });
     message.success("Update Status Completed");
+  };
+
+  const updateStatusHandle1 = async () => {
+    if (
+      typeof rows === "undefined" ||
+      rows.length === 0 ||
+      typeof data === "undefined"
+    )
+      return;
+    const url = `https://europe.tcstatus.tekla.com/statusapi/1.0`;
+    const res_status_token = await axios.post(
+      `${url}/auth/token`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${accesstoken}`,
+        },
+      }
+    );
+    const status_token = res_status_token.data;
+
+    //Get projects
+    const res_projects = await axios.get(
+      `https://app21.connect.trimble.com/tc/api/2.0/projects?fullyLoaded=true&minimal=true&sort=-name`,
+      {
+        headers: {
+          Authorization: `Bearer ${accesstoken}`,
+        },
+      }
+    );
+    const project = res_projects.data.filter((x) => x.name === projectName)[0];
+    //Get action status
+    const res_statuses = await axios.get(
+      `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${project.id}/statusactions`,
+      {
+        headers: {
+          Authorization: `Bearer ${status_token}`,
+        },
+      }
+    );
+    const statuses = res_statuses.data;
+    let updated_statuses = [];
+    rows.forEach((element) => {
+      const guid = element.GUID.trim();
+      if (typeof guid === "undefined" || guid === "") return;
+      const guid_ifc = Format(guid);
+      const matched_statuses = statuses.filter((x) =>
+        element.Status.includes(x.name)
+      );
+      if (matched_statuses.length === 0) return;
+      updated_statuses.push({
+        objectId: guid_ifc,
+        statusActionId: matched_statuses[0].id,
+        value: "Completed",
+        valueDate: new Date().toISOString(),
+      });
+    });
+
+    api.then(async (tcapi) => {
+      const modelId = data.data[0].modelId;
+      const objectRuntimeIds = [...data.data[0].objectRuntimeIds];
+
+      const guids = await tcapi.viewer.convertToObjectIds(
+        modelId,
+        objectRuntimeIds
+      );
+      await axios
+        .post(
+          `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${project.id}/statusevents`,
+          updated_statuses,
+          {
+            headers: {
+              Authorization: `Bearer ${status_token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        )
+        .then((result) => {
+          console.log(result);
+          message.success("Status has been updated");
+        })
+        .then((ex) => {
+          console.log(ex);
+          message.error("Update failed");
+        });
+    });
   };
   return (
     <Layout style={{ backgroundColor: "#ffffff" }}>
@@ -219,7 +298,7 @@ const UpdateStatus = () => {
           >
             Get AccessToken
           </Button>
-          <Button type="primary" onClick={updateStatusHandle}>
+          <Button type="primary" onClick={updateStatusHandle1}>
             Update Status
           </Button>
         </div>
