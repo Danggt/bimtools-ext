@@ -32,7 +32,6 @@ export function Format(guid) {
   return comp_arr.join('')
 }
 function cv_to_64(number, nDigits) {
-  const mapping = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$'
   let act;
   let iDigit;
   let result = [];
@@ -41,7 +40,7 @@ function cv_to_64(number, nDigits) {
 
   for (iDigit = 0; iDigit < nDigits; iDigit++) {
     result[nDigits - iDigit - 1] =
-      mapping[Math.floor(act % 64)];
+      process.env.REACT_APP_CONVERSION_TABLE[Math.floor(act % 64)];
     act /= 64;
   }
   return result.join('');
