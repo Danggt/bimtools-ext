@@ -211,35 +211,26 @@ const UpdateStatus = () => {
         valueDate: new Date().toISOString(),
       });
     });
-
-    api.then(async (tcapi) => {
-      const modelId = data.data[0].modelId;
-      const objectRuntimeIds = [...data.data[0].objectRuntimeIds];
-
-      const guids = await tcapi.viewer.convertToObjectIds(
-        modelId,
-        objectRuntimeIds
-      );
-      await axios
-        .post(
-          `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${project.id}/statusevents`,
-          updated_statuses,
-          {
-            headers: {
-              Authorization: `Bearer ${status_token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        )
-        .then((result) => {
-          console.log(result);
-          message.success("Status has been updated");
-        })
-        .then((ex) => {
-          console.log(ex);
-          message.error("Update failed");
-        });
-    });
+    console.log(updated_statuses)
+    await axios
+      .post(
+        `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${project.id}/statusevents`,
+        updated_statuses,
+        {
+          headers: {
+            Authorization: `Bearer ${status_token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      )
+      .then((result) => {
+        console.log(result);
+        message.success("Status has been updated");
+      })
+      .then((ex) => {
+        console.log(ex);
+        message.error("Update failed");
+      });
   };
   return (
     <Layout style={{ backgroundColor: "#ffffff" }}>
