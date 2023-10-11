@@ -195,10 +195,12 @@ const UpdateStatus = () => {
       }
     );
     const statuses = res_statuses.data;
+    console.log(statuses)
     let updated_statuses = [];
     rows.forEach((element) => {
       const guid = element.GUID.trim();
       if (typeof guid === "undefined" || guid === "") return;
+      console.log(element.Status)
       const guid_ifc = Format(guid);
       const matched_statuses = statuses.filter((x) =>
         element.Status.includes(x.name)
@@ -227,7 +229,7 @@ const UpdateStatus = () => {
         console.log(result);
         message.success("Status has been updated");
       })
-      .then((ex) => {
+      .catch((ex) => {
         console.log(ex);
         message.error("Update failed");
       });
