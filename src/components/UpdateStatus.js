@@ -3,7 +3,6 @@ import axios, { AxiosError, AxiosResponse } from "axios";
 import * as XLSX from "xlsx";
 import * as WorkspaceAPI from "trimble-connect-workspace-api";
 import { Layout, Button, message, Input, Form } from "antd";
-import { async } from "q";
 import { Format } from "../services/GUIDConversion";
 
 const { Content } = Layout;
@@ -15,6 +14,7 @@ const UpdateStatus = () => {
   const [guids, setGuids] = useState([]);
   const [rows, setRows] = useState([]);
   const [accesstoken, setAccesstoken] = useState();
+  const [projectId, setProjectId] = useState();
   const [projectName, setProjectName] = useState();
   useEffect(() => {
     const api = WorkspaceAPI.connect(window.parent, (event, data) => {
@@ -157,6 +157,12 @@ const UpdateStatus = () => {
   };
 
   const updateStatusHandle1 = async () => {
+    //Get current project
+    api.then((tcapi) => {
+      tcapi.project.getProject().then((result) => {
+        setProjectId(result.id);
+      });
+    });
     if (
       typeof rows === "undefined" ||
       rows.length === 0 ||
@@ -175,19 +181,9 @@ const UpdateStatus = () => {
     );
     const status_token = res_status_token.data;
 
-    //Get projects
-    const res_projects = await axios.get(
-      `https://app21.connect.trimble.com/tc/api/2.0/projects?fullyLoaded=true&minimal=true&sort=-name`,
-      {
-        headers: {
-          Authorization: `Bearer ${accesstoken}`,
-        },
-      }
-    );
-    const project = res_projects.data.filter((x) => x.name === projectName)[0];
     //Get action status
     const res_statuses = await axios.get(
-      `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${project.id}/statusactions`,
+      `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${projectId}/statusactions`,
       {
         headers: {
           Authorization: `Bearer ${status_token}`,
@@ -195,12 +191,12 @@ const UpdateStatus = () => {
       }
     );
     const statuses = res_statuses.data;
-    console.log(statuses)
+    console.log(statuses);
     let updated_statuses = [];
     rows.forEach((element) => {
       const guid = element.GUID.trim();
       if (typeof guid === "undefined" || guid === "") return;
-      console.log(element.Status)
+      console.log(element.Status);
       const guid_ifc = Format(guid);
       const matched_statuses = statuses.filter((x) =>
         element.Status.includes(x.name)
@@ -213,10 +209,10 @@ const UpdateStatus = () => {
         valueDate: new Date().toISOString(),
       });
     });
-    console.log(updated_statuses)
+    console.log(updated_statuses);
     await axios
       .post(
-        `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${project.id}/statusevents`,
+        `https://europe.tcstatus.tekla.com/statusapi/1.0/projects/${projectId}/statusevents`,
         updated_statuses,
         {
           headers: {
@@ -272,12 +268,12 @@ const UpdateStatus = () => {
                 onChange={(e) => setAccesstoken(e.target.value)}
               />
             </Form.Item>
-            <Form.Item label="Model Name">
+            {/* <Form.Item label="Model Name">
               <Input
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
               />
-            </Form.Item>
+            </Form.Item> */}
           </Form>
           <Button
             type="primary"
@@ -294,6 +290,17 @@ const UpdateStatus = () => {
           <Button type="primary" onClick={updateStatusHandle1}>
             Update Status
           </Button>
+          {/* <Button
+            type="primary"
+            onClick={() => {
+              api.then(async (tcapi) => {
+                const a = await tcapi.project.getProject()
+                console.log(a)
+              });
+            }}
+          >
+            Current Project
+          </Button> */}
         </div>
       </Content>
     </Layout>
