@@ -18,8 +18,12 @@ const UpdateStatus = () => {
   const [projectName, setProjectName] = useState();
   useEffect(() => {
     const api = WorkspaceAPI.connect(window.parent, (event, data) => {
+      // const a = localStorage.getItem("3DViewerApp.Broadcast");
+      // console.log(a);
       setEvent(event);
       setData(data);
+      console.log(event);
+      console.log(data);
     });
     setApi(api);
   }, []);
