@@ -1,7 +1,7 @@
 {
     "icon": "https://bimtools.github.io/bimtools-ext/logo192.png",
     "title": "Bimtools Extension",
-    "url": "https://bimtools.github.io/bimtools-ext/",
+    "url": "http://localhost:3000/",
     "description": "Bimtools Extension",
     "configCommand": "do_config",
     "enabled": true
