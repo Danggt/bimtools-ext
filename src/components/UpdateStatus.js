@@ -245,6 +245,11 @@ const UpdateStatus = () => {
       const modelId = objects[0].modelId;
       const objects_id = objects[0].objects.map((x) => x.id);
 
+      const external_ids = await tcapi.viewer.convertToObjectIds(
+        modelId,
+        objects_id
+      );
+      const original_ids = external_ids.map(x=>x.replace('$',''))
       const properties = await tcapi.viewer.getObjectProperties(
         modelId,
         objects_id
@@ -334,22 +339,25 @@ const UpdateStatus = () => {
           },
         }
       );
-      console.log(res_status);
-      let ids = res_status.data.map((x) => x.objectId);
-      if(ids.length ===0) return
-      if(ids.length ===1) ids.push(ids[0])
-      const model_obj_ids = await tcapi.viewer.convertToObjectRuntimeIds(
-        modelId,
-        ids
-      );
-      console.log(current_status)
+      console.log(res_status.data);
+      const ids = res_status.data.map((x) => x.objectId);
+      console.log(ids);
+      let model_obj_ids = [];
+      ids.forEach((id) => {
+        const index = original_ids.indexOf(id);
+        if (index < 0) return;
+        model_obj_ids.push(index);
+      });
+      console.log(model_obj_ids)
+
+      console.log(current_status);
       console.log(model_obj_ids)
       tcapi.viewer.setObjectState(
         {
           modelObjectIds: [
             {
               modelId: modelId,
-              objectRuntimeIds: [...model_obj_ids],
+              objectRuntimeIds: model_obj_ids,
             },
           ],
         },
@@ -450,6 +458,11 @@ const UpdateStatus = () => {
             style={{ background: "#B9770E" }}
             onClick={() => representingStatus(`5) Shipped`)}
           >{`5) Shipped`}</Button>
+          {/* <Button type="primary" onClick={()=>{
+
+          }}>
+            Reset Color
+          </Button> */}
           {/* <Button
             type="primary"
             onClick={() => {
