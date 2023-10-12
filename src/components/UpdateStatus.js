@@ -232,6 +232,134 @@ const UpdateStatus = () => {
         message.error("Update failed");
       });
   };
+  const representingStatus = (status) => {
+    //Get current project
+    api.then((tcapi) => {
+      tcapi.project.getProject().then((result) => {
+        setProjectId(result.id);
+      });
+    });
+
+    api.then(async (tcapi) => {
+      const objects = await tcapi.viewer.getObjects();
+      const modelId = objects[0].modelId;
+      const objects_id = objects[0].objects.map((x) => x.id);
+
+      const properties = await tcapi.viewer.getObjectProperties(
+        modelId,
+        objects_id
+      );
+
+      const url = `https://europe.tcstatus.tekla.com/statusapi/1.0`;
+      const res_status_token = await axios.post(
+        `${url}/auth/token`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${accesstoken}`,
+          },
+        }
+      );
+      const status_token = res_status_token.data;
+      //Get action status
+      const res_statuses = await axios.get(
+        `${url}/projects/${projectId}/statusactions`,
+        {
+          headers: {
+            Authorization: `Bearer ${status_token}`,
+          },
+        }
+      );
+
+      const statuses = res_statuses.data.map((x) => {
+        if (x.name === "1) Planning") {
+          return {
+            id: x.id,
+            color: "#F1C40F",
+            name: x.name,
+          };
+        } else if (x.name === "2) In Fabrication") {
+          return {
+            id: x.id,
+            color: "#1ABC9C",
+            name: x.name,
+          };
+        } else if (x.name === "3) In Treatment") {
+          return {
+            id: x.id,
+            color: "#2980B9",
+            name: x.name,
+          };
+        } else if (x.name === "3.1) OSWI Completed") {
+          return {
+            id: x.id,
+            color: "#9B59B6",
+            name: x.name,
+          };
+        } else if (x.name === "4) At Dispatch") {
+          return {
+            id: x.id,
+            color: "#E74C3C",
+            name: x.name,
+          };
+        } else if (x.name === "5) Shipped") {
+          return {
+            id: x.id,
+            color: "#B9770E",
+            name: x.name,
+          };
+        } else if (x.name === "Status1") {
+          return {
+            id: x.id,
+            color: "#25cf0e",
+            name: x.name,
+          };
+        } else if (x.name === "Status2") {
+          return {
+            id: x.id,
+            color: "#cf0e18",
+            name: x.name,
+          };
+        }
+      });
+      const current_status = statuses.filter(
+        (x) => typeof x !== "undefined" && x.name === status
+      )[0];
+      //Get element statuses
+      const res_status = await axios.get(
+        `${url}/projects/${projectId}/status?statusActionId=${current_status.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${status_token}`,
+          },
+        }
+      );
+      console.log(res_status);
+      let ids = res_status.data.map((x) => x.objectId);
+      if(ids.length ===0) return
+      if(ids.length ===1) ids.push(ids[0])
+      const model_obj_ids = await tcapi.viewer.convertToObjectRuntimeIds(
+        modelId,
+        ids
+      );
+      console.log(current_status)
+      console.log(model_obj_ids)
+      tcapi.viewer.setObjectState(
+        {
+          modelObjectIds: [
+            {
+              modelId: modelId,
+              objectRuntimeIds: [...model_obj_ids],
+            },
+          ],
+        },
+        {
+          color: current_status.color,
+          visible: true,
+        }
+      );
+    });
+  };
   return (
     <Layout style={{ backgroundColor: "#ffffff" }}>
       <Content style={{ padding: "10px" }}>
@@ -294,109 +422,34 @@ const UpdateStatus = () => {
           </Button>
           <Button
             type="primary"
-            onClick={() => {
-              //Get current project
-              api.then((tcapi) => {
-                tcapi.project.getProject().then((result) => {
-                  setProjectId(result.id);
-                });
-              });
-
-              api.then(async (tcapi) => {
-                const objects = await tcapi.viewer.getObjects();
-                const modelId = objects[0].modelId;
-                const objects_id = objects[0].objects.map((x) => x.id);
-               
-                const properties = await tcapi.viewer.getObjectProperties(
-                  modelId,
-                  objects_id
-                );
-
-                const url = `https://europe.tcstatus.tekla.com/statusapi/1.0`;
-                const res_status_token = await axios.post(
-                  `${url}/auth/token`,
-                  {},
-                  {
-                    headers: {
-                      Authorization: `Bearer ${accesstoken}`,
-                    },
-                  }
-                );
-                const status_token = res_status_token.data;
-                //Get action status
-                const res_statuses = await axios.get(
-                  `${url}/projects/${projectId}/statusactions`,
-                  {
-                    headers: {
-                      Authorization: `Bearer ${status_token}`,
-                    },
-                  }
-                );
-
-                const statuses = res_statuses.data.map((x) => {
-                  if (x.name === "1) Planning") {
-                    return {
-                      id: x.id,
-                      color: "#F1C40F",
-                    };
-                  } else if (x.name === "2) In Fabrication") {
-                    return {
-                      id: x.id,
-                      color: "#1ABC9C",
-                    };
-                  } else if (x.name === "3) In Treatment") {
-                    return {
-                      id: x.id,
-                      color: "#2980B9",
-                    };
-                  } else if (x.name === "3.1) OSWI Completed") {
-                    return {
-                      id: x.id,
-                      color: "#9B59B6",
-                    };
-                  } else if (x.name === "4) At Dispatch") {
-                    return {
-                      id: x.id,
-                      color: "#E74C3C",
-                    };
-                  } else if (x.name === "5) Shipped") {
-                    return {
-                      id: x.id,
-                      color: "#B9770E",
-                    };
-                  }
-                });
-                console.log(statuses);
-                statuses.forEach(async (status) => {
-                  console.log(status)
-                  //Get element statuses
-                  const res_status = await axios.get(
-                    `${url}/projects/${projectId}/status?statusActionId=9e44a463-1963-ee11-ac1c-0a47d66ce6f9`,
-                    {
-                      headers: {
-                        Authorization: `Bearer ${status_token}`,
-                      },
-                    }
-                  );
-                  console.log(res_status)
-                  const ids = res_status.data.map(x=>x.objectId);
-                  console.log(ids)
-                  const model_obj_ids = await tcapi.viewer.convertToObjectIds(modelId,ids);
-                  console.log(model_obj_ids)
-                  tcapi.viewer.setObjectState(ids, {
-                    color: status.color,
-                    visible: true,
-                  });
-                  // console.log(ids);
-                  // console.log(modelId);
-                  
-                  // console.log(model_obj_ids)
-                });
-              });
-            }}
-          >
-            Get All Objects
-          </Button>
+            style={{ background: "#F1C40F" }}
+            onClick={() => representingStatus(`1) Planning`)}
+          >{`1) Planning`}</Button>
+          <Button
+            type="primary"
+            style={{ background: "#1ABC9C" }}
+            onClick={() => representingStatus(`2) In Fabrication`)}
+          >{`2) In Fabrication`}</Button>
+          <Button
+            type="primary"
+            style={{ background: "#2980B9" }}
+            onClick={() => representingStatus(`3) In Treatment`)}
+          >{`3) In Treatment`}</Button>
+          <Button
+            type="primary"
+            style={{ background: "#9B59B6" }}
+            onClick={() => representingStatus(`3.1) OSWI Completed`)}
+          >{`3.1) OSWI Completed`}</Button>
+          <Button
+            type="primary"
+            style={{ background: "#E74C3C" }}
+            onClick={() => representingStatus(`4) At Dispatch`)}
+          >{`4) At Dispatch`}</Button>
+          <Button
+            type="primary"
+            style={{ background: "#B9770E" }}
+            onClick={() => representingStatus(`5) Shipped`)}
+          >{`5) Shipped`}</Button>
           {/* <Button
             type="primary"
             onClick={() => {
